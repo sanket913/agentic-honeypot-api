@@ -8,10 +8,8 @@ app = FastAPI(
     version="1.0"
 )
 
-# 🔐 API Key (change this)
 API_KEY = "hp_live_9f3a72d1"
 
-# --------- Data Models ----------
 class Message(BaseModel):
     sender: str
     text: str
@@ -29,11 +27,9 @@ def honeypot_endpoint(
     body: HoneypotRequest,
     x_api_key: str = Header(None)
 ):
-    # 1️⃣ Authenticate
     if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # 2️⃣ Basic scam signal detection
     scam_keywords = [
         "block", "verify", "urgent",
         "upi", "account", "suspend"
@@ -42,13 +38,11 @@ def honeypot_endpoint(
     text = body.message.text.lower()
     scam_detected = any(word in text for word in scam_keywords)
 
-    # 3️⃣ Human-like honeypot reply (tester-safe)
     if scam_detected:
         reply = "Why is my account being blocked?"
     else:
         reply = "Can you explain more?"
 
-    # 4️⃣ Minimal valid response
     return {
         "status": "success",
         "reply": reply

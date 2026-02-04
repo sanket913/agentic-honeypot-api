@@ -1,59 +1,69 @@
-from fastapi import FastAPI, Header, HTTPException
-from pydantic import BaseModel
-from typing import Optional, List
+from fastapi import FastAPI, Header, HTTPException, Request
 import random
-import uuid
-from datetime import datetime
+import datetime
+import hashlib
 
 app = FastAPI(
     title="Agentic Honeypot API",
-    description="Adaptive Scam Engagement API",
-    version="3.1"
+    version="4.0"
 )
 
 API_KEY = "hp_live_9f3a72d1"
 
-class Message(BaseModel):
-    sender: Optional[str] = "scammer"
-    text: Optional[str] = ""
-    timestamp: Optional[int] = None
-
-class HoneypotRequest(BaseModel):
-    sessionId: Optional[str] = None
-    message: Optional[Message] = Message()
-    conversationHistory: Optional[List[Message]] = []
-    metadata: Optional[dict] = {}
-
 REPLIES = [
     "Why is my account being blocked?",
-    "Which branch issued this alert?",
     "What verification is required from my side?",
     "I did not receive any prior alert, can you explain?",
-    "Can you confirm this from official support?"
+    "This sounds serious, what should I do now?",
+    "Can you explain more about this verification?",
+    "Is there any reference number for this case?"
 ]
 
+SCAM_WORDS = [
+    "block","urgent","verify","otp",
+    "account","suspend","password",
+    "bank","upi","kyc"
+]
+
+
 @app.post("/api/honeypot")
-async def honeypot_endpoint(
-    body: HoneypotRequest,
-    x_api_key: str = Header(None)
-):
+async def honeypot_endpoint(request: Request, x_api_key: str = Header(None)):
+
     if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    text = (body.message.text or "").lower()
+    try:
+        body = await request.json()
+    except:
+        body = {}
 
-    scam_words = ["bank", "verify", "otp", "urgent", "block", "kyc"]
-    score = sum(word in text for word in scam_words)
+    text = ""
+
+    if isinstance(body, dict):
+        msg = body.get("message")
+        if isinstance(msg, dict):
+            text = str(msg.get("text", ""))
+        elif isinstance(body.get("text"), str):
+            text = body.get("text")
+
+    text_lower = text.lower()
+
+    risk_score = sum(10 for w in SCAM_WORDS if w in text_lower)
+    risk_score = min(risk_score, 100)
 
     reply = random.choice(REPLIES)
+
+    session_seed = text + str(datetime.datetime.utcnow())
+    session_token = hashlib.md5(session_seed.encode()).hexdigest()[:8]
 
     return {
         "status": "success",
         "reply": reply,
-        "risk_score": score * 20,
-        "session_token": str(uuid.uuid4())[:8],
-        "timestamp": datetime.utcnow().isoformat()
+        "risk_score": risk_score,
+        "session_token": session_token,
+        "timestamp": datetime.datetime.utcnow().isoformat()
     }
+
 
 @app.get("/")
 def root():

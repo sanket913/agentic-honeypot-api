@@ -41,24 +41,17 @@ async def honeypot_endpoint(
     # API key validation
     if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
-
-    # Try reading JSON body safely
     try:
         body = await request.json()
         text = body.get("message", {}).get("text", "").lower()
     except:
         text = ""
-
-    # Decide reply (honeypot must ALWAYS reply)
     reply = random.choice(REPLIES)
-
-    # 🔥 CRITICAL: Keep response SIMPLE for evaluator
     return {
         "status": "success",
         "reply": reply
     }
-
-# Optional root endpoint (prevents confusion)
+    
 @app.get("/")
 def root():
     return {"status": "Agentic Honeypot API running"}
